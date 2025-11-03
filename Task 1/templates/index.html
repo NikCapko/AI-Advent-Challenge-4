@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Локальный чат</title>
+
+    <style>
+        * {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            display: flex;
+            flex-direction: row;
+            height: 100%;
+            font-family: sans-serif;
+        }
+
+        #sidebar {
+            width: 260px;
+            background: #222;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            left: -260px;
+            top: 0;
+            bottom: 0;
+            transition: left 0.3s ease;
+            z-index: 1000;
+        }
+
+        #sidebar.open {
+            left: 0;
+        }
+
+        #sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #111;
+            border-bottom: 1px solid #444;
+            flex-shrink: 0;
+        }
+
+        #sidebar h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        #dialogs {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+        }
+
+        .dialog {
+            padding: 10px;
+            border-bottom: 1px solid #444;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .dialog.active {
+            background: #444;
+        }
+
+        .dialog span {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dialog button {
+            margin-left: 5px;
+            font-size: 12px;
+            background: transparent;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        #addDialog {
+            margin: 10px;
+            padding: 8px;
+            background: #007bff;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            flex-shrink: 0;
+        }
+
+        #chat {
+            display: flex;
+            flex-direction: column;
+            background: #f3f3f3;
+            transition: margin-left 0.3s ease;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        #chat.shifted {
+            margin-left: 260px;
+        }
+
+        #toggleSidebar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            z-index: 0;
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 60px 10px 10px 10px;
+            min-height: 0;
+        }
+
+        .msg {
+            padding: 8px;
+            margin: 6px 0;
+            border-radius: 10px;
+            max-width: 100%;
+            word-wrap: break-word;
+        }
+
+        .user {
+            background: #d1e7ff;
+            margin-left: auto;
+        }
+
+        .assistant {
+            background: #fff;
+            border: 1px solid #ddd;
+            margin-right: auto;
+        }
+
+        #inputBox {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+            background: #fff;
+            flex-shrink: 0;
+        }
+
+        #message {
+            flex: 1;
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid #ccc;
+            resize: none;
+            min-height: 40px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        button.send {
+            margin-left: 8px;
+            padding: 0 16px;
+            border: none;
+            border-radius: 20px;
+            background: #007bff;
+            color: white;
+        }
+
+        .msg pre {
+            background: #f6f8fa;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            border: 1px solid #e1e4e8;
+        }
+
+        .msg code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .msg p code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #d63384;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <h2>Диалоги</h2>
+            <button id="closeSidebar">✖</button>
+        </div>
+        <div id="dialogs"></div>
+        <button id="addDialog">➕ Новый</button>
+    </div>
+
+    <div id="chat">
+        <button id="toggleSidebar">☰</button>
+        <div id="messages"></div>
+        <div id="inputBox">
+            <textarea id="message" placeholder="Введите сообщение..." onkeydown="handleKey(event)"></textarea>
+            <button class="send" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <script>
+        let currentDialog = null;
+
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true
+        });
+
+        async function loadDialogs() {
+            const res = await fetch("/dialogs");
+            const data = await res.json();
+            const div = document.getElementById("dialogs");
+            div.innerHTML = "";
+            data.forEach(d => {
+                const el = document.createElement("div");
+                el.className = "dialog" + (d.id === currentDialog ? " active" : "");
+                el.innerHTML = `<span>${d.name}</span>
+                        <div>
+                          <button onclick="renameDialog(${d.id});event.stopPropagation()">✏️</button>
+                          <button onclick="deleteDialog(${d.id});event.stopPropagation()">🗑</button>
+                        </div>`;
+                el.onclick = () => { currentDialog = d.id; loadMessages(); loadDialogs(); };
+                div.appendChild(el);
+            });
+        }
+
+        async function addDialog() {
+            const name = prompt("Имя диалога:");
+            if (!name) return;
+            const res = await fetch("/dialogs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+            const d = await res.json();
+            currentDialog = d.id;
+            await loadDialogs();
+            await loadMessages();
+        }
+
+        async function renameDialog(id) {
+            const name = prompt("Новое имя диалога:");
+            if (!name) return;
+            await fetch(`/dialogs/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+            loadDialogs();
+        }
+
+        async function deleteDialog(id) {
+            if (!confirm("Удалить диалог?")) return;
+            await fetch(`/dialogs/${id}`, { method: "DELETE" });
+            if (currentDialog === id) currentDialog = null;
+            loadDialogs();
+            loadMessages();
+        }
+
+        async function loadMessages() {
+            const div = document.getElementById("messages");
+            if (!currentDialog) {
+                div.innerHTML = "<p style='text-align:center;color:#888;'>Выберите или создайте диалог</p>";
+                return;
+            }
+            const res = await fetch(`/dialogs/${currentDialog}/messages`);
+            const data = await res.json();
+            div.innerHTML = "";
+            data.forEach(msg => {
+                const el = document.createElement("div");
+                el.className = "msg " + msg.role;
+                el.innerHTML = msg.role === "assistant" ? marked.parse(msg.content) : msg.content;
+                div.appendChild(el);
+            });
+            div.scrollTop = div.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("message");
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = "";
+
+            if (!currentDialog) {
+                let shortName = text.length > 20 ? text.substring(0, 20) + "…" : text;
+                const res = await fetch("/dialogs", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: shortName })
+                });
+                const d = await res.json();
+                currentDialog = d.id;
+                await loadDialogs();
+            }
+
+            const div = document.getElementById("messages");
+            const userDiv = document.createElement("div");
+            userDiv.className = "msg user";
+            userDiv.textContent = text;
+            div.appendChild(userDiv);
+
+            const loader = document.createElement("div");
+            loader.className = "msg assistant";
+            loader.textContent = "Думаю...";
+            div.appendChild(loader);
+            div.scrollTop = div.scrollHeight;
+
+            const res = await fetch(`/dialogs/${currentDialog}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await res.json();
+            loader.remove();
+            await loadMessages();
+        }
+
+        function handleKey(e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        document.getElementById("addDialog").onclick = addDialog;
+        document.getElementById("toggleSidebar").onclick = () => {
+            document.getElementById("sidebar").classList.add("open");
+            document.getElementById("chat").classList.add("shifted");
+        };
+        document.getElementById("closeSidebar").onclick = () => {
+            document.getElementById("sidebar").classList.remove("open");
+            document.getElementById("chat").classList.remove("shifted");
+        };
+
+        loadDialogs();
+        loadMessages();
+    </script>
+</body>
+
+</html>
