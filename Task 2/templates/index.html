@@ -7,16 +7,25 @@
   <style>
     body {
       font-family: sans-serif;
-      margin: 2em;
+      margin: 0;
+      padding: 0;
       background: #f5f5f5;
       color: #222;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
-    h1 { color: #3f51b5; }
+    header {
+      padding: 1em;
+      background: #3f51b5;
+      color: white;
+      font-size: 1.5em;
+    }
     #story {
+      flex: 1;
+      overflow-y: auto;
       padding: 1em;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .message {
       margin-bottom: 1em;
@@ -33,9 +42,15 @@
       font-family: monospace;
       white-space: pre-wrap;
     }
+    #options {
+      padding: 1em;
+      background: #eee;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+    }
     .option {
-      display: block;
-      margin: 0.5em 0;
+      flex: 1 1 30%;
       padding: 0.8em;
       border: none;
       background: #3f51b5;
@@ -48,7 +63,7 @@
   </style>
 </head>
 <body>
-  <h1>Текстовый квест</h1>
+  <header>Текстовый квест</header>
   <div id="story"></div>
   <div id="options"></div>
 
@@ -59,10 +74,8 @@
     const storyDiv = document.getElementById('story');
     const optionsDiv = document.getElementById('options');
 
-    const initialStory = document.createElement('div');
-    initialStory.className = 'message system';
-    initialStory.textContent = "Ты просыпаешься в незнакомой комнате. Свет тусклый, воздух пахнет сыростью.";
-    storyDiv.appendChild(initialStory);
+    // начальная история
+    addMessage('system', "Ты просыпаешься в незнакомой комнате. Свет тусклый, воздух пахнет сыростью.");
 
     renderOptions(["Осмотреться", "Крикнуть", "Попробовать открыть дверь"]);
 
@@ -82,7 +95,7 @@
       msg.className = `message ${role}`;
       msg.innerHTML = `<div>${role === 'player' ? '> ' : ''}${text}</div>`;
 
-      if (jsonData) {
+      if (role === 'system' && jsonData) {
         const details = document.createElement('details');
         const summary = document.createElement('summary');
         summary.textContent = "Показать JSON";

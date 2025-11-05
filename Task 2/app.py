@@ -41,6 +41,7 @@ def generate_story(prompt: str):
         "modelUri": f"gpt://{YC_API_FOLDER_ID}/{MODEL_NAME}",
         "completionOptions": {"stream": False, "temperature": 0.8, "maxTokens": 300},
         "messages": [{"role": "user", "text": prompt}],
+        "json_object": True
     }
 
     response = requests.post(YANDEX_API_URL, headers=headers, json=payload)
@@ -73,20 +74,7 @@ def continue_story():
         llm_response = generate_story(prompt)
         print("[DEBUG] llm_response =", llm_response)
 
-        # --- 💡 Попробуем аккуратно извлечь JSON ---
-        match = re.search(r"\{.*\}", llm_response, re.DOTALL)
-        if not match:
-            raise ValueError("JSON not found in LLM response")
-
-        json_text = match.group(0).strip()
-
-        # Попробуем загрузить как есть
-        try:
-            parsed = json.loads(json_text)
-        except json.JSONDecodeError:
-            # Попробуем почистить странные кавычки/переносы
-            cleaned = json_text.replace("\n", "").replace("\r", "")
-            parsed = json.loads(cleaned)
+        parsed = json.loads(llm_response)
 
         # --- обновляем контекст ---
         sessions[session_id]["context"] += f"\nИгрок: {action}\nСистема: {parsed['text']}"
