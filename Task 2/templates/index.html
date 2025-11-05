@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Текстовый квест с YandexGPT</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em;
+      background: #f5f5f5;
+      color: #222;
+    }
+    h1 { color: #3f51b5; }
+    #story {
+      padding: 1em;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .message {
+      margin-bottom: 1em;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.5em;
+    }
+    .player { color: #009688; font-weight: bold; }
+    .system { color: #000; }
+    details {
+      margin-top: 0.3em;
+      background: #f0f0f0;
+      padding: 0.5em;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    .option {
+      display: block;
+      margin: 0.5em 0;
+      padding: 0.8em;
+      border: none;
+      background: #3f51b5;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    .option:hover { background: #2c3cae; }
+  </style>
+</head>
+<body>
+  <h1>Текстовый квест</h1>
+  <div id="story"></div>
+  <div id="options"></div>
+
+  <script>
+    const sessionId = crypto.randomUUID();
+    const apiUrl = "/api/continue";
+
+    const storyDiv = document.getElementById('story');
+    const optionsDiv = document.getElementById('options');
+
+    const initialStory = document.createElement('div');
+    initialStory.className = 'message system';
+    initialStory.textContent = "Ты просыпаешься в незнакомой комнате. Свет тусклый, воздух пахнет сыростью.";
+    storyDiv.appendChild(initialStory);
+
+    renderOptions(["Осмотреться", "Крикнуть", "Попробовать открыть дверь"]);
+
+    function renderOptions(options) {
+      optionsDiv.innerHTML = '';
+      options.forEach(option => {
+        const btn = document.createElement('button');
+        btn.className = 'option';
+        btn.textContent = option;
+        btn.onclick = () => sendAction(option);
+        optionsDiv.appendChild(btn);
+      });
+    }
+
+    function addMessage(role, text, jsonData = null) {
+      const msg = document.createElement('div');
+      msg.className = `message ${role}`;
+      msg.innerHTML = `<div>${role === 'player' ? '> ' : ''}${text}</div>`;
+
+      if (jsonData) {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = "Показать JSON";
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(jsonData, null, 2);
+        details.appendChild(summary);
+        details.appendChild(pre);
+        msg.appendChild(details);
+      }
+
+      storyDiv.appendChild(msg);
+      storyDiv.scrollTop = storyDiv.scrollHeight;
+    }
+
+    async function sendAction(action) {
+      addMessage('player', action);
+      optionsDiv.innerHTML = '<p>Подождите...</p>';
+
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, player_action: action })
+        });
+        const data = await res.json();
+        addMessage('system', data.text, data);
+        renderOptions(data.options);
+      } catch (err) {
+        addMessage('system', `[Ошибка: ${err.message}]`);
+        renderOptions(["Повторить", "Закончить"]);
+      }
+    }
+  </script>
+</body>
+</html>
